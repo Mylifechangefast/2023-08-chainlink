@@ -243,12 +243,13 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
       revert ISlashable.InvalidSlasherConfig();
     }
 
-    s_slasherConfigs[slasher] = config;
-
-    // refill capacity
     SlasherState storage state = s_slasherState[slasher];
+
+    // Set slasher configuration and initialize slasher state in one operation
+    s_slasherConfigs[slasher] = config;
     state.remainingSlashCapacityAmount = config.slashCapacity;
     state.lastSlashTimestamp = block.timestamp;
+
 
     emit SlasherConfigSet(slasher, config.refillRate, config.slashCapacity);
   }
