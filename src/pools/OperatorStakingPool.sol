@@ -232,6 +232,9 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
     if (!hasRole(SLASHER_ROLE, slasher)) {
       revert InvalidSlasher();
     }
+    if(config.slashCapacity == 0) {
+       revert();
+}
     _setSlasherConfig(slasher, config);
   }
 
