@@ -56,20 +56,24 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
   // ===============
 
   /// @inheritdoc StakingPoolBase
-  function _validateOnTokenTransfer(
+ function _validateOnTokenTransfer(
     address sender,
     address staker,
     bytes calldata data
-  ) internal view override {
+) internal view override {
+
+    // Cache the merkle root to avoid multiple storage reads
+    bytes32 merkleRoot = s_merkleRoot;
+
     // check if staker has access
     // if the sender is the migration proxy, the staker is allowed to stake
-    // if currently in public phase (merkle root set to empty bytes) data is ignored
-    // if in the access limited phase data is the merkle proof
-    // if in migrations only phase, the merkle root is set to double hash of the migration proxy
+    // if currently in the public phase (merkle root set to empty bytes) data is ignored
+    // if in the access-limited phase data is the merkle proof
+    // if in migrations-only phase, the merkle root is set to double hash of the migration proxy
     // address. This is essentially only used as a placeholder to differentiate between the open
-    // phase (empty merkle root) and access limited phase (merkle root generated from allowlist)
+    // phase (empty merkle root) and access-limited phase (merkle root generated from allowlist)
     if (
-      sender != address(s_migrationProxy) && s_merkleRoot != bytes32(0)
+      sender != address(s_migrationProxy) && merkleRoot != bytes32(0)
         && !_hasAccess(staker, abi.decode(data, (bytes32[])))
     ) {
       revert AccessForbidden();
@@ -79,11 +83,14 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
     if (s_operatorStakingPool.isOperator(staker) || s_operatorStakingPool.isRemoved(staker)) {
       revert AccessForbidden();
     }
-  }
+}
+
 
   /// @inheritdoc StakingPoolBase
   function _handleOpen() internal view override(StakingPoolBase) {
-    if (s_merkleRoot == bytes32(0)) {
+    // Cache the merkle root to avoid multiple storage reads
+     bytes merkleRoot = s_merkleRoot;
+    if (merkleRoot == bytes32(0)) {
       revert MerkleRootNotSet();
     }
   }
@@ -107,10 +114,12 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
   /// @return bool True if the community staker has access to the access limited
   /// community staking pool
   function _hasAccess(address staker, bytes32[] memory proof) private view returns (bool) {
-    if (s_merkleRoot == bytes32(0)) return true;
+    // Cache the merkle root to avoid multiple storage reads
+    bytes32 merkleRoot = s_merkleRoot;
+    if (merkleRoot == bytes32(0)) return true;
     return MerkleProof.verify({
       proof: proof,
-      root: s_merkleRoot,
+      root: merkleRoot,
       leaf: keccak256(bytes.concat(keccak256(abi.encode(staker))))
     });
   }
