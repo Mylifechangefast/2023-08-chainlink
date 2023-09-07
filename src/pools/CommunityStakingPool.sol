@@ -60,26 +60,36 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
     address sender,
     address staker,
     bytes calldata data
-  ) internal view override {
+) internal view override {
+    // Cache the merkle root to avoid multiple storage reads
+    bytes32 merkleRoot = s_merkleRoot;
+
+    // Cache the operatorStakingPool contract
+    OperatorStakingPool operatorStakingPool = s_operatorStakingPool;
+
+    // Cache the migration proxy address
+    address migrationProxy = s_migrationProxy;
+
     // check if staker has access
     // if the sender is the migration proxy, the staker is allowed to stake
-    // if currently in public phase (merkle root set to empty bytes) data is ignored
-    // if in the access limited phase data is the merkle proof
-    // if in migrations only phase, the merkle root is set to double hash of the migration proxy
+    // if currently in the public phase (merkle root set to empty bytes) data is ignored
+    // if in the access-limited phase data is the merkle proof
+    // if in migrations-only phase, the merkle root is set to double hash of the migration proxy
     // address. This is essentially only used as a placeholder to differentiate between the open
-    // phase (empty merkle root) and access limited phase (merkle root generated from allowlist)
+    // phase (empty merkle root) and access-limited phase (merkle root generated from allowlist)
     if (
-      sender != address(s_migrationProxy) && s_merkleRoot != bytes32(0)
+      sender != migrationProxy && merkleRoot != bytes32(0)
         && !_hasAccess(staker, abi.decode(data, (bytes32[])))
     ) {
       revert AccessForbidden();
     }
 
     // check if the sender is an operator
-    if (s_operatorStakingPool.isOperator(staker) || s_operatorStakingPool.isRemoved(staker)) {
+    if (operatorStakingPool.isOperator(staker) || operatorStakingPool.isRemoved(staker)) {
       revert AccessForbidden();
     }
-  }
+}
+
 
   /// @inheritdoc StakingPoolBase
   function _handleOpen() internal view override(StakingPoolBase) {
