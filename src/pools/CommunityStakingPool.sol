@@ -134,10 +134,16 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
     external
     onlyRole(DEFAULT_ADMIN_ROLE)
   {
-    if (address(newOperatorStakingPool) == address(0)) revert InvalidZeroAddress();
-    address oldOperatorStakingPool = address(s_operatorStakingPool);
+      // Check if the newOperatorStakingPool address is zero using inline assembly
+    assembly {
+        if iszero(newOperatorStakingPool) {
+            revert(0, 0) // Revert with no error message
+        }
+    }
+
+    address oldOperatorStakingPool = address(s_operatorStakingPool); 
     s_operatorStakingPool = newOperatorStakingPool;
-    emit OperatorStakingPoolChanged(oldOperatorStakingPool, address(newOperatorStakingPool));
+    emit OperatorStakingPoolChanged(oldOperatorStakingPool, newOperatorStakingPool);
   }
 
   // =======================
