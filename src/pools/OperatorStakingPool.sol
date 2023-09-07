@@ -157,7 +157,10 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
     whenBeforeClosing
   {
     if (amount == 0) revert InvalidAlerterRewardFundAmount();
-    s_alerterRewardFunds += amount;
+
+    // cache state varaible 
+    uint256 alerterRewardFunds = s_alerterRewardFunds;
+    alerterRewardFunds += amount;
     // The return value is not checked since the call will revert if any balance, allowance or
     // receiver conditions fail.
     i_LINK.transferFrom({from: msg.sender, to: address(this), value: amount});
@@ -175,7 +178,9 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
     if (amount > s_alerterRewardFunds) {
       revert InsufficientAlerterRewardFunds(amount, s_alerterRewardFunds);
     }
-    s_alerterRewardFunds -= amount;
+    // cache state variable 
+    uint256 alerterRewardFunds = s_alerterRewardFunds;
+    alerterRewardFunds -= amount;
     // The return value is not checked since the call will revert if any balance, allowance or
     // receiver conditions fail.
     i_LINK.transfer(msg.sender, amount);
@@ -332,7 +337,7 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
         latestPrincipal: updatedPrincipal,
         latestStakedAtTime: stakerStakedAtTime
       });
-
+     
       totalSlashedAmount += slashedAmount;
 
       emit Slashed(operators[i], slashedAmount, updatedPrincipal);
@@ -352,10 +357,15 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
     uint256 totalSlashedAmount,
     uint256 alerterRewardAmount
   ) private {
-    uint256 newAlerterRewardFunds = s_alerterRewardFunds + totalSlashedAmount;
+    // cache state variable
+    uint256 alerterRewardFunds = s_alerterRewardFunds;
+
+    uint256 newAlerterRewardFunds = alerterRewardFunds + totalSlashedAmount;
     uint256 alerterRewardActual =
       newAlerterRewardFunds < alerterRewardAmount ? newAlerterRewardFunds : alerterRewardAmount;
-    s_alerterRewardFunds = newAlerterRewardFunds - alerterRewardActual;
+
+  
+    alerterRewardFunds = newAlerterRewardFunds - alerterRewardActual;
 
     // We emit an event here instead of reverting so that the alerter can
     // immediately receive a portion of their rewards.  This event
@@ -429,7 +439,7 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
     validatePoolSpace(
       s_pool.configs.maxPoolSize,
       s_pool.configs.maxPrincipalPerStaker,
-      s_numOperators + operators.length
+      numOperators + operators.length
     )
     onlyRole(DEFAULT_ADMIN_ROLE)
   {
@@ -454,7 +464,9 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
       emit OperatorAdded(operatorAddress);
     }
 
-    s_numOperators += operators.length;
+    // cache state variable
+    uint256 numOperators = s_numOperators;
+    numOperators += operators.length;
   }
 
   /// @notice Removes one or more operators from a list of operators.
