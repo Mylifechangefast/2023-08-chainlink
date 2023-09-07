@@ -61,6 +61,8 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
     address staker,
     bytes calldata data
   ) internal view override {
+    // cache migration proxy address
+    address migrationProxy = s_migrationProxy;
     // check if staker has access
     // if the sender is the migration proxy, the staker is allowed to stake
     // if currently in public phase (merkle root set to empty bytes) data is ignored
@@ -69,7 +71,7 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
     // address. This is essentially only used as a placeholder to differentiate between the open
     // phase (empty merkle root) and access limited phase (merkle root generated from allowlist)
     if (
-      sender != address(s_migrationProxy) && s_merkleRoot != bytes32(0)
+      sender != address(migrationProxy) && s_merkleRoot != bytes32(0)
         && !_hasAccess(staker, abi.decode(data, (bytes32[])))
     ) {
       revert AccessForbidden();
