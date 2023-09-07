@@ -157,11 +157,13 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
     whenBeforeClosing
   {
     if (amount == 0) revert InvalidAlerterRewardFundAmount();
-    s_alerterRewardFunds += amount;
+    // cache state variable
+    uint256 alerterRewardFunds = s_alerterRewardFunds;
+    alerterRewardFunds += amount;
     // The return value is not checked since the call will revert if any balance, allowance or
     // receiver conditions fail.
     i_LINK.transferFrom({from: msg.sender, to: address(this), value: amount});
-    emit AlerterRewardDeposited(amount, s_alerterRewardFunds);
+    emit AlerterRewardDeposited(amount, alerterRewardFunds);
   }
 
   /// @notice Withdraws LINK from the alerter reward funds
@@ -171,15 +173,17 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
   /// funds.
   /// @dev precondition This contract must be closed (before opening or after closing).
   function withdrawAlerterReward(uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    if (s_isOpen) revert PoolNotClosed();
-    if (amount > s_alerterRewardFunds) {
-      revert InsufficientAlerterRewardFunds(amount, s_alerterRewardFunds);
+    bool isOpen = s_isOpen;
+    uint256 alerterRewardFunds = s_alerterRewardFunds;
+    if (isOpen) revert PoolNotClosed();
+    if (amount > alerterRewardFunds) {
+      revert InsufficientAlerterRewardFunds(amount, alerterRewardFunds);
     }
-    s_alerterRewardFunds -= amount;
+    alerterRewardFunds -= amount;
     // The return value is not checked since the call will revert if any balance, allowance or
     // receiver conditions fail.
     i_LINK.transfer(msg.sender, amount);
-    emit AlerterRewardWithdrawn(amount, s_alerterRewardFunds);
+    emit AlerterRewardWithdrawn(amount, alerterRewardFunds);
   }
 
   /// @notice Returns the balance of the pool's alerter reward funds
@@ -352,10 +356,11 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
     uint256 totalSlashedAmount,
     uint256 alerterRewardAmount
   ) private {
-    uint256 newAlerterRewardFunds = s_alerterRewardFunds + totalSlashedAmount;
+    uint256 alerterRewardFunds = s_alerterRewardFunds;
+    uint256 newAlerterRewardFunds = alerterRewardFunds + totalSlashedAmount;
     uint256 alerterRewardActual =
       newAlerterRewardFunds < alerterRewardAmount ? newAlerterRewardFunds : alerterRewardAmount;
-    s_alerterRewardFunds = newAlerterRewardFunds - alerterRewardActual;
+    alerterRewardFunds = newAlerterRewardFunds - alerterRewardActual;
 
     // We emit an event here instead of reverting so that the alerter can
     // immediately receive a portion of their rewards.  This event
@@ -392,6 +397,7 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
   /// @inheritdoc StakingPoolBase
   function _validateOnTokenTransfer(address, address staker, bytes calldata) internal view override {
     // check if staker is an operator
+    
     if (!s_operators[staker].isOperator) revert StakerNotOperator();
   }
 
@@ -403,7 +409,7 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
   )
     external
     override
-    validatePoolSpace(maxPoolSize, maxPrincipalPerStaker, s_numOperators)
+    validatePoolSpace(maxPoolSize, maxPrincipalPerStaker, umOperators)
     whenOpen
     onlyRole(DEFAULT_ADMIN_ROLE)
   {
@@ -412,8 +418,9 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
 
   /// @inheritdoc StakingPoolBase
   function _handleOpen() internal view override(StakingPoolBase) {
-    if (s_numOperators < i_minInitialOperatorCount) {
-      revert InadequateInitialOperatorCount(s_numOperators, i_minInitialOperatorCount);
+    uint256 numOperators = s_numOperators;
+    if (numOperators < i_minInitialOperatorCount) {
+      revert InadequateInitialOperatorCount(numOperators, i_minInitialOperatorCount);
     }
   }
 
@@ -429,7 +436,7 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
     validatePoolSpace(
       s_pool.configs.maxPoolSize,
       s_pool.configs.maxPrincipalPerStaker,
-      s_numOperators + operators.length
+      numOperators + operators.length
     )
     onlyRole(DEFAULT_ADMIN_ROLE)
   {
@@ -453,8 +460,8 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
       operator.isOperator = true;
       emit OperatorAdded(operatorAddress);
     }
-
-    s_numOperators += operators.length;
+    uint256 numOperators = s_numOperators
+    numOperators += operators.length;
   }
 
   /// @notice Removes one or more operators from a list of operators.
@@ -506,8 +513,8 @@ contract OperatorStakingPool is ISlashable, StakingPoolBase, TypeAndVersionInter
 
       emit OperatorRemoved(operatorAddress, principal);
     }
-
-    s_numOperators -= operators.length;
+    uint256 numOperators = s_numOperators
+    numOperators -= operators.length;
   }
 
   /// @notice Getter function to check if an address is registered as an operator
