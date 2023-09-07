@@ -83,7 +83,9 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
 
   /// @inheritdoc StakingPoolBase
   function _handleOpen() internal view override(StakingPoolBase) {
-    if (s_merkleRoot == bytes32(0)) {
+    // cache state variable
+    bytes32 merkleRoot = s_merkleRoot;
+    if (merkleRoot == bytes32(0)) {
       revert MerkleRootNotSet();
     }
   }
@@ -107,10 +109,12 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
   /// @return bool True if the community staker has access to the access limited
   /// community staking pool
   function _hasAccess(address staker, bytes32[] memory proof) private view returns (bool) {
-    if (s_merkleRoot == bytes32(0)) return true;
+    // cache state variable
+    bytes32 merkleRoot = s_merkleRoot;
+    if (merkleRoot == bytes32(0)) return true;
     return MerkleProof.verify({
       proof: proof,
-      root: s_merkleRoot,
+      root: merkleRoot,
       leaf: keccak256(bytes.concat(keccak256(abi.encode(staker))))
     });
   }
@@ -135,8 +139,10 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
     onlyRole(DEFAULT_ADMIN_ROLE)
   {
     if (address(newOperatorStakingPool) == address(0)) revert InvalidZeroAddress();
-    address oldOperatorStakingPool = address(s_operatorStakingPool);
-    s_operatorStakingPool = newOperatorStakingPool;
+    // cache the OperatorStakingPool contract
+    OperatorStakingPool operatorStakingPool = s_operatorStakingPool;
+    address oldOperatorStakingPool = address(operatorStakingPool);
+    operatorStakingPool = newOperatorStakingPool;
     emit OperatorStakingPoolChanged(oldOperatorStakingPool, address(newOperatorStakingPool));
   }
 
