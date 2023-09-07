@@ -47,7 +47,7 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
     if (address(params.operatorStakingPool) == address(0)) {
       revert InvalidZeroAddress();
     }
-
+    
     s_operatorStakingPool = params.operatorStakingPool;
   }
 
@@ -61,6 +61,9 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
     address staker,
     bytes calldata data
   ) internal view override {
+    // Cache the operatorStakingPool contract
+    OperatorStakingPool operatorStakingPool = s_operatorStakingPool;
+ 
     // check if staker has access
     // if the sender is the migration proxy, the staker is allowed to stake
     // if currently in public phase (merkle root set to empty bytes) data is ignored
@@ -76,7 +79,8 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
     }
 
     // check if the sender is an operator
-    if (s_operatorStakingPool.isOperator(staker) || s_operatorStakingPool.isRemoved(staker)) {
+     
+    if (operatorStakingPool.isOperator(staker) || operatorStakingPool.isRemoved(staker)) {
       revert AccessForbidden();
     }
   }
@@ -135,8 +139,10 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
     onlyRole(DEFAULT_ADMIN_ROLE)
   {
     if (address(newOperatorStakingPool) == address(0)) revert InvalidZeroAddress();
-    address oldOperatorStakingPool = address(s_operatorStakingPool);
-    s_operatorStakingPool = newOperatorStakingPool;
+    // Cache the operatorStakingPool contract
+    OperatorStakingPool operatorStakingPool = s_operatorStakingPool;
+    address oldOperatorStakingPool = address(operatorStakingPool);
+    operatorStakingPool = newOperatorStakingPool;
     emit OperatorStakingPoolChanged(oldOperatorStakingPool, address(newOperatorStakingPool));
   }
 
