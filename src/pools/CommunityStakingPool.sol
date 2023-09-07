@@ -43,13 +43,16 @@ contract CommunityStakingPool is StakingPoolBase, IMerkleAccessController, TypeA
   /// of staker addresses with early acccess.
   bytes32 private s_merkleRoot;
 
-  constructor(ConstructorParams memory params) StakingPoolBase(params.baseParams) {
-    if (address(params.operatorStakingPool) == address(0)) {
-      revert InvalidZeroAddress();
+constructor(ConstructorParams memory params) StakingPoolBase(params.baseParams) {
+    address zeroAddress;
+    assembly {
+        zeroAddress := 0
     }
 
-    s_operatorStakingPool = params.operatorStakingPool;
-  }
+    if (address(params.operatorStakingPool) == zeroAddress) {
+        revert InvalidZeroAddress();
+    }
+}
 
   // ===============
   // StakingPoolBase
