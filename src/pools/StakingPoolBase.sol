@@ -248,8 +248,9 @@ abstract contract StakingPoolBase is
     _updateStakerHistory({staker: staker, latestPrincipal: 0, latestStakedAtTime: 0});
     // The return value is not checked since the call will revert if any balance, allowance or
     // receiver conditions fail.
-    i_LINK.transferAndCall({to: s_migrationTarget, value: stakerPrincipal, data: migrationData});
-    emit StakerMigrated(s_migrationTarget, stakerPrincipal, migrationData);
+     address migrationTarget= s_migrationTarget
+    i_LINK.transferAndCall({to: migrationTarget, value: stakerPrincipal, data: migrationData});
+    emit StakerMigrated(migrationTarget, stakerPrincipal, migrationData);
   }
 
   /// @inheritdoc Migratable
@@ -312,12 +313,16 @@ abstract contract StakingPoolBase is
   /// @notice Sets the new reward vault for the pool
   /// @param newRewardVault The new reward vault
   /// @dev precondition The caller must have the default admin role.
-  function setRewardVault(IRewardVault newRewardVault) external onlyRole(DEFAULT_ADMIN_ROLE) {
+ function setRewardVault(IRewardVault newRewardVault) external onlyRole(DEFAULT_ADMIN_ROLE) {
     if (address(newRewardVault) == address(0)) revert InvalidZeroAddress();
-    address oldRewardVault = address(s_rewardVault);
+    
+    IRewardVault oldRewardVault = s_rewardVault; // Cache the old value
+    
     s_rewardVault = newRewardVault;
-    emit RewardVaultSet(oldRewardVault, address(newRewardVault));
-  }
+    
+    emit RewardVaultSet(address(oldRewardVault), address(newRewardVault));
+}
+
 
   /// @notice LINK transfer callback function called when transferAndCall is called with this
   /// contract as a target.
@@ -344,8 +349,13 @@ abstract contract StakingPoolBase is
   {
     if (amount == 0) return;
 
+    // cache state varaible 
+     address migrationProxy = s_migrationProxy;
+
     // Check if this call was forwarded from the migration proxy.
-    address staker = sender == s_migrationProxy ? _getStakerAddress(data) : sender;
+    
+    address staker = sender == migrationProxy ? _getStakerAddress(data) : sender;
+      
     if (staker == address(0)) revert InvalidZeroAddress();
 
     // includes access check for non migration proxy
@@ -414,7 +424,9 @@ abstract contract StakingPoolBase is
     validateRewardVaultSet
     whenRewardVaultOpen
   {
-    s_isOpen = true;
+    // cache state variable
+    bool isOpen = s_isOpen;
+    isOpen = true;
     emit PoolOpened();
 
     _handleOpen();
@@ -423,7 +435,10 @@ abstract contract StakingPoolBase is
   /// @inheritdoc IStakingOwner
   /// @dev precondition The caller must have the default admin role.
   function close() external override(IStakingOwner) onlyRole(DEFAULT_ADMIN_ROLE) whenOpen {
-    s_isOpen = false;
+    
+    // cache state variable
+     bool isOpen = s_isOpen;
+    isOpen = false;
     s_pool.state.closedAt = block.timestamp;
     emit PoolClosed();
   }
@@ -476,7 +491,9 @@ abstract contract StakingPoolBase is
 
     uint256 updatedPrincipal = stakerPrincipal - amount;
     // in the case of a partial withdrawal, verify new staked LINK amount is above minimum
-    if (amount < stakerPrincipal && updatedPrincipal < i_minPrincipalPerStaker) {
+    // cache state variable
+    minPrincipalPerStaker = i_minPrincipalPerStaker
+    if (amount < stakerPrincipal && updatedPrincipal < minPrincipalPerStaker) {
       revert UnstakePrincipalBelowMinAmount();
     }
 
@@ -644,7 +661,9 @@ abstract contract StakingPoolBase is
   /// @notice Util function for setting the unbonding period
   /// @param unbondingPeriod The unbonding period
   function _setUnbondingPeriod(uint256 unbondingPeriod) internal {
-    if (unbondingPeriod < MIN_UNBONDING_PERIOD || unbondingPeriod > i_maxUnbondingPeriod) {
+    // cache state variable
+    uint32 maxUnbondingPeriod = i_maxUnbondingPeriod;
+    if (unbondingPeriod < MIN_UNBONDING_PERIOD || unbondingPeriod > maxUnbondingPeriod) {
       revert InvalidUnbondingPeriod();
     }
 
@@ -656,7 +675,10 @@ abstract contract StakingPoolBase is
   /// @notice Util function for setting the claim period
   /// @param claimPeriod The claim period
   function _setClaimPeriod(uint256 claimPeriod) private {
-    if (claimPeriod < i_minClaimPeriod || claimPeriod > i_maxClaimPeriod) {
+    // caache state variable
+    uint32 minClaimPeriod  = i_minClaimPeriod;
+    uint32 maxClaimPeriod i_maxClaimPeriod;
+    if (claimPeriod < minClaimPeriod || claimPeriod > maxClaimPeriod) {
       revert InvalidClaimPeriod();
     }
     uint256 oldClaimPeriod = s_pool.configs.claimPeriod;
@@ -673,7 +695,8 @@ abstract contract StakingPoolBase is
     Staker storage staker = s_stakers[sender];
 
     // validate staking limits
-    if (newPrincipal < i_minPrincipalPerStaker) {
+    uint96 minPrincipalPerStaker = i_minPrincipalPerStaker;
+    if (newPrincipal < minPrincipalPerStaker) {
       revert InsufficientStakeAmount();
     }
     if (newPrincipal > s_pool.configs.maxPrincipalPerStaker) {
@@ -740,7 +763,7 @@ abstract contract StakingPoolBase is
     uint256 latestStakedAtTime
   ) internal {
     staker.history.push(
-      s_checkpointId++,
+      checkpointId++,
       (uint224(uint112(latestPrincipal)) << 112) | uint224(uint112(latestStakedAtTime))
     );
   }
@@ -757,19 +780,22 @@ abstract contract StakingPoolBase is
 
   /// @dev Reverts if migration proxy is not set
   modifier validateMigrationProxySet() {
-    if (s_migrationProxy == address(0)) revert MigrationProxyNotSet();
+     address  migrationProxy = s_migrationProxy;
+    if (migrationProxy == address(0)) revert MigrationProxyNotSet();
     _;
   }
 
   /// @dev Reverts if reward vault is not set
   modifier validateRewardVaultSet() {
-    if (address(s_rewardVault) == address(0)) revert RewardVaultNotSet();
+    IRewardVault rewardVault = s_rewardVault;
+    if (address(ewardVault) == address(0)) revert RewardVaultNotSet();
     _;
   }
 
   /// @dev Reverts if pool is after an opening
   modifier whenBeforeOpening() {
-    if (s_isOpen) revert PoolHasBeenOpened();
+    bool isOpen = s_isOpen;
+    if (isOpen) revert PoolHasBeenOpened();
     if (s_pool.state.closedAt != 0) revert PoolHasBeenClosed();
     _;
   }
@@ -782,6 +808,7 @@ abstract contract StakingPoolBase is
 
   /// @dev Reverts if pool is not open
   modifier whenOpen() {
+    bool isOpen = s_isOpen;
     if (!s_isOpen) revert PoolNotOpen();
     _;
   }
